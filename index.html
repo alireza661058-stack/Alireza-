@@ -1,0 +1,222 @@
+
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>مدرسه دانایی | پایه ششم</title>
+<style>
+body{font-family:Tahoma;background:#eaf3ff;margin:0;padding:15px;color:#233}
+main{max-width:750px;margin:auto;background:white;padding:20px;border-radius:20px;box-shadow:0 5px 20px #0002}
+h1,h2{text-align:center;color:#2458b8}
+button,select{font:inherit;border:0;border-radius:12px;padding:13px;margin:6px;cursor:pointer}
+button{background:#2864d7;color:white}
+.book{width:43%;min-width:130px;background:#e7efff;color:#183b78}
+.option{display:block;width:100%;background:#edf2ff;color:#222;text-align:right}
+.option:disabled{opacity:1}
+.correct{background:#c8f7d4!important}
+.wrong{background:#ffd1d1!important;animation:shake .3s}
+@keyframes shake{25%{transform:translateX(6px)}75%{transform:translateX(-6px)}}
+textarea{width:95%;height:100px;border:2px solid #ccd8ee;border-radius:12px;padding:10px;font:inherit}
+.hidden{display:none}
+#message{font-size:21px;font-weight:bold;text-align:center;min-height:35px}
+.small{color:#667;text-align:center;font-size:13px}
+</style>
+</head>
+<body>
+<main>
+<h1>🎓 مدرسه دانایی</h1>
+<p class="small">سامانه آزمون و یادگیری پایه ششم دبستان</p>
+
+<section id="home">
+<h2>کتاب مورد نظر را انتخاب کن</h2>
+<div id="books"></div>
+</section>
+
+<section id="lessons" class="hidden">
+<h2 id="bookTitle"></h2>
+<div id="lessonList"></div>
+<button onclick="goHome()">بازگشت به کتاب‌ها</button>
+</section>
+
+<section id="quiz" class="hidden">
+<h2 id="quizTitle"></h2>
+<p id="progress"></p>
+<h3 id="question"></h3>
+<div id="answers"></div>
+<div id="message"></div>
+<button id="next" class="hidden" onclick="nextQuestion()">سؤال بعدی</button>
+</section>
+
+<section id="result" class="hidden">
+<h2>🏆 نتیجه آزمون</h2>
+<h3 id="score"></h3>
+<p id="details"></p>
+<button onclick="goHome()">بازگشت به صفحه اول</button>
+</section>
+
+<hr>
+<p class="small">
+سازنده: علیرضا دهقانی | ۱۱ ساله | کلاس ششم<br>
+دبستان شهید فرخی | کازرون
+</p>
+</main>
+
+<script>
+// فهرست اولیه؛ نام درس‌ها را پس از بررسی PDF کتاب‌ها کامل می‌کنیم.
+const books={
+"فارسی":["درس اول","درس دوم","درس سوم"],
+"علوم":["درس اول","درس دوم","درس سوم"],
+"مطالعات اجتماعی":["درس اول","درس دوم","درس سوم"],
+"هدیه‌های آسمان":["درس اول","درس دوم","درس سوم"]
+};
+
+// نمونه سؤال برای نمایش عملکرد برنامه.
+// سؤال‌های واقعی هر درس باید از متن PDF همان درس وارد شوند.
+const questionBank={
+"فارسی":{
+"درس اول":[
+{type:"test",q:"کدام گزینه معنی واژه دانا را نشان می‌دهد؟",a:["آگاه","نادان","خسته","غمگین"],c:0},
+{type:"test",q:"کدام گزینه یک جمله کامل است؟",a:["کتاب زیبا","دانش‌آموز درس خواند.","درخت سبز","هوای پاک"],c:1},
+{type:"tf",q:"واژه‌های هم‌معنی، معنی یکسان یا نزدیک دارند.",c:true},
+{type:"tf",q:"هر جمله حتماً باید چندین فعل داشته باشد.",c:false},
+{type:"essay",q:"با یکی از واژه‌های درس یک جمله بنویس."}
+]
+}
+};
+
+let selectedBook="",selectedLesson="";
+let questions=[],wrong=[],index=0,score=0,answered=false,review=false;
+
+function show(id){
+["home","lessons","quiz","result"].forEach(x=>
+document.getElementById(x).classList.toggle("hidden",x!==id));
+}
+
+function init(){
+let box=document.getElementById("books");
+Object.keys(books).forEach(book=>{
+let b=document.createElement("button");
+b.className="book";
+b.textContent=book;
+b.onclick=()=>chooseBook(book);
+box.appendChild(b);
+});
+}
+function chooseBook(book){
+selectedBook=book;
+document.getElementById("bookTitle").textContent=book;
+let box=document.getElementById("lessonList");
+box.innerHTML="";
+books[book].forEach(lesson=>{
+let b=document.createElement("button");
+b.textContent=lesson;
+b.onclick=()=>startLesson(lesson);
+box.appendChild(b);
+});
+show("lessons");
+}
+function goHome(){show("home");}
+
+function shuffle(arr){
+let a=[...arr];
+for(let i=a.length-1;i>0;i--){
+let j=Math.floor(Math.random()*(i+1));
+[a[i],a[j]]=[a[j],a[i]];
+}
+return a;
+}
+
+function startLesson(lesson){
+selectedLesson=lesson;
+let original=questionBank[selectedBook]?.[lesson]||[];
+if(!original.length){
+alert("سؤال‌های این درس هنوز وارد بانک سؤال نشده‌اند. برای سؤال‌های دقیق، متن کتاب لازم است.");
+return;
+}
+questions=shuffle(original);
+wrong=[];index=0;score=0;review=false;
+document.getElementById("quizTitle").textContent=selectedBook+" | "+lesson;
+show("quiz");
+render();
+}
+
+function render(){
+answered=false;
+let q=questions[index];
+document.getElementById("progress").textContent=
+"سؤال "+(index+1)+" از "+questions.length;
+document.getElementById("question").textContent=q.q;
+document.getElementById("answers").innerHTML="";
+document.getElementById("message").textContent="";
+document.getElementById("next").classList.add("hidden");
+
+if(q.type==="essay"){
+document.getElementById("answers").innerHTML=
+'<textarea id="essay" placeholder="پاسخت را بنویس..."></textarea><br><button onclick="submitEssay()">ثبت پاسخ</button>';
+return;
+}
+if(q.type==="tf"){
+addOption("درست",true,q.c===true);
+addOption("نادرست",false,q.c===false);
+return;
+}
+let options=q.a.map((v,i)=>({text:v,correct:i===q.c}));
+shuffle(options).forEach(o=>addOption(o.text,o.correct,o.correct));
+}
+
+function addOption(text,value,isCorrect){
+let b=document.createElement("button");
+b.className="option";
+b.textContent=text;
+b.onclick=()=>answer(value,isCorrect,b);
+document.getElementById("answers").appendChild(b);
+}
+
+function answer(value,correct,button){
+if(answered)return;
+answered=true;
+document.querySelectorAll(".option").forEach(b=>b.disabled=true);
+if(correct){
+score++;
+button.classList.add("correct");
+document.getElementById("message").textContent="🎉 بابا دستخوش! آفرین!";
+}else{
+button.classList.add("wrong");
+document.getElementById("message").textContent="❌ جواب درست نبود؛ دوباره یاد می‌گیریم!";
+if(!review)wrong.push(questions[index]);
+}
+document.getElementById("next").classList.remove("hidden");
+}
+
+function submitEssay(){
+if(answered)return;
+answered=true;
+let value=document.getElementById("essay").value.trim();
+document.getElementById("message").textContent=value?
+"پاسخت ثبت شد؛ آن را با متن کتاب مقایسه کن.":"پاسخی نوشته نشد؛ این سؤال برای مرور می‌ماند.";
+if(!value&&!review)wrong.push(questions[index]);
+document.getElementById("next").classList.remove("hidden");
+}
+
+function nextQuestion(){
+index++;
+if(index<questions.length){render();return;}
+if(!review&&wrong.length){
+questions=shuffle(wrong);
+wrong=[];index=0;review=true;
+document.getElementById("quizTitle").textContent+=" | مرور اشتباه‌ها";
+render();
+}else finish();
+}
+
+function finish(){
+show("result");
+document.getElementById("score").textContent="امتیاز خودکار: "+score;
+document.getElementById("details").textContent=
+"آزمون تمام شد! سؤال‌های تشریحی باید با پاسخ کتاب بررسی شوند.";
+}
+init();
+</script>
+</body>
+</html>
